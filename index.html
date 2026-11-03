@@ -133,13 +133,13 @@
             <h2>Compare categories by month</h2>
           </div>
           <div class="table-tools">
-            <label class="sr-only" for="compare-range">Months to compare</label>
-            <select id="compare-range" aria-label="Months to compare">
-              <option value="3" selected>Last 3 months</option>
-              <option value="6">Last 6 months</option>
-              <option value="12">Last 12 months</option>
-              <option value="all">All months</option>
-            </select>
+            <span class="table-range">
+              <label class="sr-only" for="compare-from">From</label>
+              <select id="compare-from" aria-label="From month"></select>
+              <span class="range-dash" aria-hidden="true">–</span>
+              <label class="sr-only" for="compare-to">To</label>
+              <select id="compare-to" aria-label="To month"></select>
+            </span>
             <label class="sr-only" for="compare-count">Categories to show</label>
             <select id="compare-count" aria-label="Categories to show">
               <option value="8">Top 8</option>
@@ -168,11 +168,7 @@
             <h2>Full breakdown</h2>
           </div>
           <div class="table-tools">
-            <label class="sr-only" for="month-filter">Filter month</label>
-            <select id="month-filter" aria-label="Months to show">
-              <option value="all">All months</option>
-            </select>
-            <span class="table-range" id="table-range" hidden>
+            <span class="table-range">
               <label class="sr-only" for="table-from">From</label>
               <select id="table-from" aria-label="From month"></select>
               <span class="range-dash" aria-hidden="true">–</span>

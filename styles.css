@@ -1334,10 +1334,6 @@ body.entry-open .fab {
   gap: 0.4rem;
 }
 
-.table-range[hidden] {
-  display: none;
-}
-
 .range-dash {
   color: var(--ink-soft);
   font-weight: 700;
@@ -1345,13 +1341,13 @@ body.entry-open .fab {
 
 #table-from,
 #table-to,
-#month-filter,
+#compare-from,
+#compare-to,
 #share-month,
 #payments-month,
 #income-month,
 #drawer-months,
 #compare-count,
-#compare-range,
 #compare-sort {
   appearance: none;
   border: 1px solid var(--line);

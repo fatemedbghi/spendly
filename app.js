@@ -89,11 +89,10 @@ const els = {
   compareChart: document.getElementById("compare-chart"),
   compareCount: document.getElementById("compare-count"),
   compareSort: document.getElementById("compare-sort"),
-  compareRange: document.getElementById("compare-range"),
+  compareFrom: document.getElementById("compare-from"),
+  compareTo: document.getElementById("compare-to"),
   rankList: document.getElementById("rank-list"),
   rankCaption: document.getElementById("rank-caption"),
-  monthFilter: document.getElementById("month-filter"),
-  tableRange: document.getElementById("table-range"),
   tableFrom: document.getElementById("table-from"),
   tableTo: document.getElementById("table-to"),
   shareMonth: document.getElementById("share-month"),
@@ -962,7 +961,7 @@ function render() {
   renderMonthOptions(els.shareMonth);
   renderCategoryBreakdown(categoryTotals);
   renderCompare(categoryTotals);
-  renderTableRangeOptions();
+  renderRangePickers();
   renderTable(categoryTotals, monthTotals, grand);
   renderMonthOptions(els.paymentsMonth);
   renderPayments();
@@ -1002,10 +1001,41 @@ function renderCategoryBreakdown(categoryTotals) {
   renderRankList(items, grand);
 }
 
-/** The most recent months shown in the compare chart, per the range picker. */
+/** From–to months shared by Compare and Full breakdown; null means the last 3 months. */
+let monthRange = null;
+
+function rangeMonths() {
+  const months = state.months;
+  let a = monthRange ? months.indexOf(monthRange.from) : -1;
+  let b = monthRange ? months.indexOf(monthRange.to) : -1;
+  if (a === -1 || b === -1) {
+    a = Math.max(0, months.length - 3);
+    b = months.length - 1;
+  }
+  if (a > b) [a, b] = [b, a];
+  return months.slice(a, b + 1);
+}
+
+function rangePickers() {
+  return [
+    [els.compareFrom, els.compareTo],
+    [els.tableFrom, els.tableTo],
+  ];
+}
+
+function renderRangePickers() {
+  const months = rangeMonths();
+  const options = state.months.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join("");
+  for (const [from, to] of rangePickers()) {
+    from.innerHTML = options;
+    to.innerHTML = options;
+    from.value = months[0] ?? "";
+    to.value = months[months.length - 1] ?? "";
+  }
+}
+
 function compareMonths() {
-  const range = els.compareRange?.value || "3";
-  return range === "all" ? state.months : state.months.slice(-Number(range));
+  return rangeMonths();
 }
 
 /** The category's amount in the month before `month`, or null for the first loaded month. */
@@ -1625,45 +1655,8 @@ function renderMonthOptions(select) {
   select.value = state.months.includes(current) ? current : "all";
 }
 
-/** Ranges for the breakdown table: quick spans, whole years, a custom from–to, or one month. */
-function renderTableRangeOptions() {
-  const select = els.monthFilter;
-  const current = select.value || "all";
-  const years = [...new Set(state.months.map((m) => m.split(" ")[1]))];
-  const spans = [3, 6, 12].filter((n) => n < state.months.length);
-  const opt = (value, label) => `<option value="${escapeAttr(value)}">${escapeHtml(label)}</option>`;
-  select.innerHTML =
-    opt("all", "All months") +
-    spans.map((n) => opt(`last:${n}`, `Last ${n} months`)).join("") +
-    (years.length > 1 ? `<optgroup label="Years">${years.map((y) => opt(`year:${y}`, y)).join("")}</optgroup>` : "") +
-    opt("custom", "Custom range…") +
-    `<optgroup label="One month">${[...state.months].reverse().map((m) => opt(m, m)).join("")}</optgroup>`;
-  select.value = [...select.options].some((o) => o.value === current) ? current : "all";
-
-  for (const [el, fallback] of [
-    [els.tableFrom, state.months[0]],
-    [els.tableTo, state.months[state.months.length - 1]],
-  ]) {
-    const keep = el.value;
-    el.innerHTML = state.months.map((m) => opt(m, m)).join("");
-    el.value = state.months.includes(keep) ? keep : fallback;
-  }
-  els.tableRange.hidden = select.value !== "custom";
-}
-
 function tableMonths() {
-  const value = els.monthFilter.value || "all";
-  if (value === "all") return state.months;
-  if (value.startsWith("last:")) return state.months.slice(-Number(value.slice(5)));
-  if (value.startsWith("year:")) return state.months.filter((m) => m.endsWith(` ${value.slice(5)}`));
-  if (value === "custom") {
-    let a = state.months.indexOf(els.tableFrom.value);
-    let b = state.months.indexOf(els.tableTo.value);
-    if (a === -1 || b === -1) return state.months;
-    if (a > b) [a, b] = [b, a];
-    return state.months.slice(a, b + 1);
-  }
-  return state.months.includes(value) ? [value] : state.months;
+  return rangeMonths();
 }
 
 function renderTable(categoryTotals, monthTotals, grand) {
@@ -2424,15 +2417,6 @@ function wireEvents() {
   });
 
   els.exportBtn.addEventListener("click", exportMergedCsv);
-  const refreshTable = () => {
-    els.tableRange.hidden = els.monthFilter.value !== "custom";
-    const { categoryTotals, monthTotals, grand } = computeTotals();
-    renderTable(categoryTotals, monthTotals, grand);
-  };
-  els.monthFilter.addEventListener("change", refreshTable);
-  els.tableFrom.addEventListener("change", refreshTable);
-  els.tableTo.addEventListener("change", refreshTable);
-
   const refreshCompare = () => {
     if (!state.months.length) return;
     const { categoryTotals } = computeTotals();
@@ -2440,7 +2424,18 @@ function wireEvents() {
   };
   els.compareCount?.addEventListener("change", refreshCompare);
   els.compareSort?.addEventListener("change", refreshCompare);
-  els.compareRange?.addEventListener("change", refreshCompare);
+  for (const [from, to] of rangePickers()) {
+    const onChange = () => {
+      monthRange = { from: from.value, to: to.value };
+      renderRangePickers();
+      if (!state.months.length) return;
+      const { categoryTotals, monthTotals, grand } = computeTotals();
+      renderCompare(categoryTotals);
+      renderTable(categoryTotals, monthTotals, grand);
+    };
+    from.addEventListener("change", onChange);
+    to.addEventListener("change", onChange);
+  }
 
   // Files can be dropped anywhere on the page; the overlay only shows while dragging.
   const dz = els.dropzone;
