@@ -169,9 +169,16 @@
           </div>
           <div class="table-tools">
             <label class="sr-only" for="month-filter">Filter month</label>
-            <select id="month-filter">
+            <select id="month-filter" aria-label="Months to show">
               <option value="all">All months</option>
             </select>
+            <span class="table-range" id="table-range" hidden>
+              <label class="sr-only" for="table-from">From</label>
+              <select id="table-from" aria-label="From month"></select>
+              <span class="range-dash" aria-hidden="true">–</span>
+              <label class="sr-only" for="table-to">To</label>
+              <select id="table-to" aria-label="To month"></select>
+            </span>
             <button type="button" class="btn btn-ghost btn-sm" id="export-btn">
               Export CSV
             </button>

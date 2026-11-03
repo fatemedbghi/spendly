@@ -93,6 +93,9 @@ const els = {
   rankList: document.getElementById("rank-list"),
   rankCaption: document.getElementById("rank-caption"),
   monthFilter: document.getElementById("month-filter"),
+  tableRange: document.getElementById("table-range"),
+  tableFrom: document.getElementById("table-from"),
+  tableTo: document.getElementById("table-to"),
   shareMonth: document.getElementById("share-month"),
   drawer: document.getElementById("drawer"),
   drawerTitle: document.getElementById("drawer-title"),
@@ -959,7 +962,7 @@ function render() {
   renderMonthOptions(els.shareMonth);
   renderCategoryBreakdown(categoryTotals);
   renderCompare(categoryTotals);
-  renderMonthOptions(els.monthFilter);
+  renderTableRangeOptions();
   renderTable(categoryTotals, monthTotals, grand);
   renderMonthOptions(els.paymentsMonth);
   renderPayments();
@@ -1622,12 +1625,54 @@ function renderMonthOptions(select) {
   select.value = state.months.includes(current) ? current : "all";
 }
 
+/** Ranges for the breakdown table: quick spans, whole years, a custom from–to, or one month. */
+function renderTableRangeOptions() {
+  const select = els.monthFilter;
+  const current = select.value || "all";
+  const years = [...new Set(state.months.map((m) => m.split(" ")[1]))];
+  const spans = [3, 6, 12].filter((n) => n < state.months.length);
+  const opt = (value, label) => `<option value="${escapeAttr(value)}">${escapeHtml(label)}</option>`;
+  select.innerHTML =
+    opt("all", "All months") +
+    spans.map((n) => opt(`last:${n}`, `Last ${n} months`)).join("") +
+    (years.length > 1 ? `<optgroup label="Years">${years.map((y) => opt(`year:${y}`, y)).join("")}</optgroup>` : "") +
+    opt("custom", "Custom range…") +
+    `<optgroup label="One month">${[...state.months].reverse().map((m) => opt(m, m)).join("")}</optgroup>`;
+  select.value = [...select.options].some((o) => o.value === current) ? current : "all";
+
+  for (const [el, fallback] of [
+    [els.tableFrom, state.months[0]],
+    [els.tableTo, state.months[state.months.length - 1]],
+  ]) {
+    const keep = el.value;
+    el.innerHTML = state.months.map((m) => opt(m, m)).join("");
+    el.value = state.months.includes(keep) ? keep : fallback;
+  }
+  els.tableRange.hidden = select.value !== "custom";
+}
+
+function tableMonths() {
+  const value = els.monthFilter.value || "all";
+  if (value === "all") return state.months;
+  if (value.startsWith("last:")) return state.months.slice(-Number(value.slice(5)));
+  if (value.startsWith("year:")) return state.months.filter((m) => m.endsWith(` ${value.slice(5)}`));
+  if (value === "custom") {
+    let a = state.months.indexOf(els.tableFrom.value);
+    let b = state.months.indexOf(els.tableTo.value);
+    if (a === -1 || b === -1) return state.months;
+    if (a > b) [a, b] = [b, a];
+    return state.months.slice(a, b + 1);
+  }
+  return state.months.includes(value) ? [value] : state.months;
+}
+
 function renderTable(categoryTotals, monthTotals, grand) {
-  const filter = els.monthFilter.value || "all";
-  const months = filter === "all" ? state.months : [filter];
-  const showAvg = filter === "all" && state.months.length > 1;
+  const months = tableMonths();
+  const sumOver = (valueOf) => months.reduce((s, m) => s + (valueOf(m) || 0), 0);
+  const scopedGrand = sumOver((m) => monthTotals[m]);
+  const showAvg = months.length > 1;
   const avgCell = (total) =>
-    showAvg ? `<td class="num avg-cell">${money(total / state.months.length)}</td>` : "";
+    showAvg ? `<td class="num avg-cell">${money(total / months.length)}</td>` : "";
 
   els.tableHead.innerHTML = `<tr>
     <th>Category</th>
@@ -1639,8 +1684,7 @@ function renderTable(categoryTotals, monthTotals, grand) {
 
   const bodyRows = categoryTotals
     .map((c) => {
-      const scopedTotal = filter === "all" ? c.total : c.row[filter] || 0;
-      const scopedGrand = filter === "all" ? grand : monthTotals[filter] || 0;
+      const scopedTotal = sumOver((m) => c.row[m]);
       const rowCls = scopedTotal === 0 ? ` class="is-empty"` : "";
       return `<tr${rowCls}>
         <td>${categoryLink(c.category)}</td>
@@ -1660,7 +1704,6 @@ function renderTable(categoryTotals, monthTotals, grand) {
   const totalCells = months
     .map((m) => `<td class="num">${money(monthTotals[m] || 0)}</td>`)
     .join("");
-  const scopedGrand = filter === "all" ? grand : monthTotals[filter] || 0;
 
   const signedCell = (v) => `<td class="num${v < 0 ? " is-negative" : ""}">${v < 0 ? "−" : ""}${money(Math.abs(v))}</td>`;
   const line = (label, cls, valueOf) => {
@@ -1669,7 +1712,7 @@ function renderTable(categoryTotals, monthTotals, grand) {
         <td>${label}</td>
         ${months.map((m) => signedCell(valueOf(m))).join("")}
         ${signedCell(total)}
-        ${showAvg ? `<td class="num avg-cell">${money(total / state.months.length)}</td>` : ""}
+        ${showAvg ? `<td class="num avg-cell">${money(total / months.length)}</td>` : ""}
         <td class="num"></td>
       </tr>`;
   };
@@ -2381,10 +2424,14 @@ function wireEvents() {
   });
 
   els.exportBtn.addEventListener("click", exportMergedCsv);
-  els.monthFilter.addEventListener("change", () => {
+  const refreshTable = () => {
+    els.tableRange.hidden = els.monthFilter.value !== "custom";
     const { categoryTotals, monthTotals, grand } = computeTotals();
     renderTable(categoryTotals, monthTotals, grand);
-  });
+  };
+  els.monthFilter.addEventListener("change", refreshTable);
+  els.tableFrom.addEventListener("change", refreshTable);
+  els.tableTo.addEventListener("change", refreshTable);
 
   const refreshCompare = () => {
     if (!state.months.length) return;

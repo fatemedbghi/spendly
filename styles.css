@@ -1328,6 +1328,23 @@ body.entry-open .fab {
   align-items: center;
 }
 
+.table-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.table-range[hidden] {
+  display: none;
+}
+
+.range-dash {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+#table-from,
+#table-to,
 #month-filter,
 #share-month,
 #payments-month,
