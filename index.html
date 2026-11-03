@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spendly — Monthly spending</title>
+    <meta name="theme-color" content="#fbf6ef" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Spendly" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="icons/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,500..700,0..100&family=Nunito:wght@400..800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Spendly</span>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="reset-btn" hidden>
+          <span>Clear<span class="wide-only"> data</span></span>
+        </button>
+        <label class="btn btn-primary btn-sm" for="csv-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add file
+          <input
+            id="csv-input"
+            type="file"
+            accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            multiple
+            class="sr-only"
+          />
+        </label>
+      </div>
+    </header>
+
+    <div class="dropzone" id="dropzone" hidden aria-hidden="true">
+      <div class="dropzone-inner">
+        <strong>Drop your Excel or CSV file</strong>
+        <span>It will merge into your spending</span>
+      </div>
+    </div>
+
+    <main>
+      <p class="hint status-line" id="status-line" hidden></p>
+
+      <section class="panel welcome" id="welcome" hidden>
+        <span class="welcome-mark" aria-hidden="true"></span>
+        <h1>Add your spending workbook</h1>
+        <p>Pick your <strong>spending.xlsx</strong> from Files or iCloud Drive. It's read and kept only on this device; nothing is uploaded.</p>
+        <label class="btn btn-primary" for="csv-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Choose file
+        </label>
+        <p class="welcome-note">When you update the workbook, tap <strong>Add file</strong> and pick it again.</p>
+      </section>
+
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Sections" hidden>
+        <button type="button" class="tab" role="tab" data-tab="overview" aria-selected="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg>
+          <span>Overview</span>
+        </button>
+        <button type="button" class="tab" role="tab" data-tab="compare" aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/></svg>
+          <span>Compare</span>
+        </button>
+        <button type="button" class="tab" role="tab" data-tab="breakdown" aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 10v10"/></svg>
+          <span>Breakdown</span>
+        </button>
+        <button type="button" class="tab" role="tab" data-tab="payments" aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M3 10h18M7 15h3"/></svg>
+          <span>Payments</span>
+        </button>
+        <button type="button" class="tab" role="tab" data-tab="income" aria-selected="false" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 3 7-7"/><path d="M15 8h5v5"/></svg>
+          <span>Income</span>
+        </button>
+      </nav>
+
+      <section class="stats" id="stats" data-tab-panel="overview" hidden></section>
+
+      <section class="panel" id="charts-panel" data-tab-panel="overview" hidden>
+        <div class="panel-head row">
+          <h2 id="month-chart-title">Monthly total</h2>
+          <div class="month-legend chart-key" id="month-chart-legend" aria-hidden="true" hidden>
+            <span class="month-legend-item"><span class="month-legend-swatch key-spent"></span>Spent</span>
+            <span class="month-legend-item"><span class="month-legend-swatch key-income"></span>Income</span>
+          </div>
+        </div>
+        <div class="chart-frame">
+          <canvas id="month-chart" width="900" height="280"></canvas>
+        </div>
+      </section>
+
+      <section class="panel split" id="category-panel" data-tab-panel="overview" hidden>
+        <div class="panel-head row split-head">
+          <div>
+            <h2>Spending by category</h2>
+            <p>
+              <span id="rank-caption">Every category, largest first</span>
+              · click one to see its payments
+            </p>
+          </div>
+          <div class="table-tools">
+            <label class="sr-only" for="share-month">Month to show</label>
+            <select id="share-month">
+              <option value="all">All months</option>
+            </select>
+          </div>
+        </div>
+        <div class="chart-frame square">
+          <canvas id="share-chart" width="420" height="420"></canvas>
+        </div>
+        <ol class="rank-list" id="rank-list"></ol>
+      </section>
+
+      <section class="panel" id="compare-panel" data-tab-panel="compare" hidden>
+        <div class="panel-head row">
+          <div>
+            <h2>Compare categories by month</h2>
+          </div>
+          <div class="table-tools">
+            <label class="sr-only" for="compare-range">Months to compare</label>
+            <select id="compare-range" aria-label="Months to compare">
+              <option value="3" selected>Last 3 months</option>
+              <option value="6">Last 6 months</option>
+              <option value="12">Last 12 months</option>
+              <option value="all">All months</option>
+            </select>
+            <label class="sr-only" for="compare-count">Categories to show</label>
+            <select id="compare-count" aria-label="Categories to show">
+              <option value="8">Top 8</option>
+              <option value="12" selected>Top 12</option>
+              <option value="20">Top 20</option>
+              <option value="all">All categories</option>
+            </select>
+            <label class="sr-only" for="compare-sort">Sort by</label>
+            <select id="compare-sort" aria-label="Sort categories">
+              <option value="total" selected>Sort by total</option>
+              <option value="swing">Sort by biggest swing</option>
+              <option value="latest">Sort by latest month</option>
+              <option value="name">Sort A–Z</option>
+            </select>
+          </div>
+        </div>
+        <div class="month-legend" id="month-legend" aria-hidden="true"></div>
+        <div class="chart-frame compare-chart-frame">
+          <canvas id="compare-chart" width="900" height="420"></canvas>
+        </div>
+      </section>
+
+      <section class="panel" id="table-panel" data-tab-panel="breakdown" hidden>
+        <div class="panel-head row">
+          <div>
+            <h2>Full breakdown</h2>
+          </div>
+          <div class="table-tools">
+            <label class="sr-only" for="month-filter">Filter month</label>
+            <select id="month-filter">
+              <option value="all">All months</option>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" id="export-btn">
+              Export CSV
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="spend-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="payments-panel" data-tab-panel="payments" hidden>
+        <div class="panel-head row">
+          <div>
+            <h2>All payments</h2>
+            <p id="payments-caption"></p>
+          </div>
+          <div class="table-tools">
+            <label class="sr-only" for="payments-month">Month to show</label>
+            <select id="payments-month">
+              <option value="all">All months</option>
+            </select>
+          </div>
+        </div>
+        <ul class="txn-list payments-list" id="payments-list"></ul>
+      </section>
+
+      <section class="panel" id="income-panel" data-tab-panel="income" hidden>
+        <div class="panel-head row">
+          <div>
+            <h2>Income</h2>
+            <p id="income-caption"></p>
+          </div>
+          <div class="table-tools">
+            <label class="sr-only" for="income-month">Month to show</label>
+            <select id="income-month">
+              <option value="all">All months</option>
+            </select>
+          </div>
+        </div>
+        <div class="income-summary" id="income-summary"></div>
+        <h3 class="income-subhead">Sources</h3>
+        <ul class="income-sources" id="income-sources"></ul>
+        <h3 class="income-subhead">Deposits</h3>
+        <ul class="txn-list payments-list" id="deposits-list"></ul>
+      </section>
+    </main>
+
+    <div class="drawer" id="drawer" hidden>
+      <div class="drawer-backdrop" data-close></div>
+      <aside
+        class="drawer-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawer-title"
+      >
+        <header class="drawer-head">
+          <div>
+            <h2 id="drawer-title"></h2>
+            <p class="drawer-scope" id="drawer-scope"></p>
+          </div>
+          <button
+            type="button"
+            class="drawer-close"
+            id="drawer-close"
+            data-close
+            aria-label="Close details"
+          >
+            ×
+          </button>
+        </header>
+        <div class="drawer-chips">
+          <label class="sr-only" for="drawer-months">Month to show</label>
+          <select id="drawer-months"></select>
+        </div>
+        <div class="drawer-body" id="drawer-body"></div>
+      </aside>
+    </div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
