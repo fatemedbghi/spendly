@@ -1,9 +1,9 @@
-const CACHE = "spendly-v3";
+const CACHE = "spendly-v4";
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
+  "./styles.css?v=4",
+  "./app.js?v=4",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-512.png",
