@@ -64,7 +64,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           Choose file
         </label>
-        <p class="welcome-note">When you update the workbook, tap <strong>Add file</strong> and pick it again.</p>
+        <p class="welcome-note">When you update the workbook, tap <strong>Add file</strong> and pick it again. Or tap <strong>+</strong> to add entries one by one.</p>
       </section>
 
       <nav class="tabs" id="tabs" role="tablist" aria-label="Sections" hidden>
@@ -221,6 +221,52 @@
         <ul class="txn-list payments-list" id="deposits-list"></ul>
       </section>
     </main>
+
+    <button type="button" class="fab" id="entry-open" aria-label="Add an entry by hand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+
+    <div class="drawer entry-drawer" id="entry-drawer" hidden>
+      <div class="drawer-backdrop" data-entry-close></div>
+      <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="entry-title">
+        <header class="drawer-head">
+          <div>
+            <h2 id="entry-title">New entry</h2>
+            <p class="drawer-scope">Saved on this device</p>
+          </div>
+          <button type="button" class="drawer-close" data-entry-close aria-label="Close">×</button>
+        </header>
+        <form class="entry-form" id="entry-form" novalidate>
+          <div class="segmented" role="radiogroup" aria-label="Entry type">
+            <label><input type="radio" name="kind" value="spending" checked /><span>Spending</span></label>
+            <label><input type="radio" name="kind" value="income" /><span>Income</span></label>
+          </div>
+          <label class="field">
+            <span>Amount (CAD)</span>
+            <input name="amount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" required />
+          </label>
+          <label class="field">
+            <span data-kind-label="category">Category</span>
+            <input name="category" type="text" list="entry-categories" placeholder="e.g. Groceries" autocomplete="off" required />
+            <datalist id="entry-categories"></datalist>
+          </label>
+          <label class="field">
+            <span data-kind-label="description">Merchant</span>
+            <input name="description" type="text" placeholder="e.g. No Frills" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Date</span>
+            <input name="date" type="date" required />
+          </label>
+          <label class="field">
+            <span>Note <span class="muted">(optional)</span></span>
+            <input name="notes" type="text" autocomplete="off" />
+          </label>
+          <p class="hint err" id="entry-error" hidden></p>
+          <button type="submit" class="btn btn-primary entry-save">Save entry</button>
+        </form>
+      </aside>
+    </div>
 
     <div class="drawer" id="drawer" hidden>
       <div class="drawer-backdrop" data-close></div>

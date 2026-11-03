@@ -643,8 +643,160 @@ select:focus-visible {
 
 /* ---------- Category details drawer ---------- */
 
-body.drawer-open {
+body.drawer-open,
+body.entry-open {
   overflow: hidden;
+}
+
+.fab {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e69c86, #c96f5f);
+  color: #fff;
+  box-shadow: 0 14px 30px -10px rgba(169, 90, 74, 0.65);
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.fab:hover {
+  transform: translateY(-2px);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.fab svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+body.drawer-open .fab,
+body.entry-open .fab {
+  display: none;
+}
+
+.entry-form {
+  display: grid;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem 2rem;
+  overflow-y: auto;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgba(90, 62, 48, 0.07);
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: block;
+  padding: 0.55rem 0;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+
+.segmented input:checked + span {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(90, 62, 48, 0.12);
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--moss-bright);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field > span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.field .muted {
+  font-weight: 500;
+}
+
+.field input {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field input:focus {
+  border-color: var(--moss-bright);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(227, 144, 127, 0.2);
+}
+
+.field input[name="amount"] {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.entry-save {
+  margin-top: 0.25rem;
+}
+
+.entry-form .hint.err {
+  margin: 0;
+}
+
+.badge-manual {
+  background: rgba(181, 154, 216, 0.18);
+  color: #7a5fa6;
+}
+
+.badge-delete {
+  border: 1px solid rgba(192, 86, 63, 0.3);
+  background: #fff;
+  color: var(--up);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.badge-delete:hover {
+  background: rgba(192, 86, 63, 0.08);
 }
 
 .drawer {
@@ -1398,6 +1550,10 @@ tbody tr.is-empty td {
 }
 
 @media (max-width: 700px) {
+  body:has(.tabs:not([hidden])) .fab {
+    bottom: calc(6.4rem + env(safe-area-inset-bottom));
+  }
+
   body:has(.tabs:not([hidden])) main {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }

@@ -58,6 +58,11 @@ const els = {
   input: document.getElementById("csv-input"),
   reset: document.getElementById("reset-btn"),
   welcome: document.getElementById("welcome"),
+  entryOpen: document.getElementById("entry-open"),
+  entryDrawer: document.getElementById("entry-drawer"),
+  entryForm: document.getElementById("entry-form"),
+  entryError: document.getElementById("entry-error"),
+  entryCategories: document.getElementById("entry-categories"),
   exportBtn: document.getElementById("export-btn"),
   dropzone: document.getElementById("dropzone"),
   stats: document.getElementById("stats"),
@@ -1736,6 +1741,10 @@ function shortDate(iso) {
   return { day: d, mon: MONTH_NAMES[m - 1].slice(0, 3), year: y };
 }
 
+function manualBadges(id) {
+  return `<span class="badge badge-manual">Added by hand</span><button type="button" class="badge badge-delete" data-delete-entry="${escapeAttr(id)}">Delete</button>`;
+}
+
 /** Payment rows, newest first. `showCategory` adds a clickable category tag to each row. */
 function txnListHtml(txns, { groupByMonth = true, showCategory = false } = {}) {
   const list = [...txns].sort((a, b) => b.date.localeCompare(a.date));
@@ -1767,6 +1776,7 @@ function txnListHtml(txns, { groupByMonth = true, showCategory = false } = {}) {
         badges.push(`<span class="badge${t.amount < 0 ? " badge-credit" : ""}">${escapeHtml(t.type)}</span>`);
       }
       if (t.review) badges.push(`<span class="badge badge-warn">${escapeHtml(t.review)}</span>`);
+      if (t.manual) badges.push(manualBadges(t.id));
       if (t.adjustment) {
         badges.push(
           `<span class="badge">Adjusted ${t.adjustment > 0 ? "+" : "−"}${money(Math.abs(t.adjustment))} from ${money(t.statement)}</span>`
@@ -1876,7 +1886,7 @@ function renderIncome() {
         <span class="txn-date"><strong>${day.day}</strong>${day.mon}</span>
         <div class="txn-main">
           <span class="txn-merchant" title="${escapeAttr(d.description)}">${escapeHtml(tidyDeposit(d.description))}</span>
-          <span class="txn-badges"><span class="badge"><span class="badge-dot" style="background:${colorOf[d.source] || "#86b89a"}"></span>${escapeHtml(d.source)}</span></span>
+          <span class="txn-badges"><span class="badge"><span class="badge-dot" style="background:${colorOf[d.source] || "#86b89a"}"></span>${escapeHtml(d.source)}</span>${d.manual ? manualBadges(d.id) : ""}</span>
           ${d.notes ? `<span class="txn-notes" title="Click to show the full note">${escapeHtml(d.notes)}</span>` : ""}
         </div>
         <span class="txn-amount is-income">+${money(d.amount)}</span>
@@ -2050,7 +2060,31 @@ function plural(n, one, many = `${one}s`) {
 }
 
 function importMatrix(matrix, label) {
+  // A file replaces the months it covers, which would drop entries added by hand in those months.
+  const spendMonths = new Set(matrix.months);
+  const incomeMonths = new Set(matrix.income?.months || []);
+  const manualTxns = state.transactions.filter((t) => t.manual && spendMonths.has(t.month));
+  const manualDeposits = matrix.income ? state.deposits.filter((d) => d.manual && incomeMonths.has(d.month)) : [];
+  const manualCount = manualTxns.length + manualDeposits.length;
+  const keepManual =
+    manualCount > 0 &&
+    window.confirm(
+      `This file covers months where you added ${plural(manualCount, "entry", "entries")} by hand.\n\n` +
+        "OK: keep them as well (if they aren't in the file).\nCancel: use the file only."
+    );
   mergeIntoState(matrix, label);
+  if (keepManual) {
+    for (const t of manualTxns) {
+      state.transactions.push(t);
+      applySpending(t, 1);
+    }
+    for (const d of manualDeposits) {
+      state.deposits.push(d);
+      applyIncome(d, 1);
+    }
+    sortEntries();
+    persist();
+  }
   render();
   const detail = matrix.transactions
     ? ` with ${plural(matrix.transactions.length, "payment")}`
@@ -2152,6 +2186,172 @@ function csvEscape(value) {
   const s = String(value ?? "");
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
+}
+
+/* ---------- Entries added by hand ---------- */
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+function monthOfDate(iso) {
+  const [y, m] = iso.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+function ensureMonth(month) {
+  if (!state.months.includes(month)) state.months = sortMonths([...state.months, month]);
+}
+
+function sortEntries() {
+  state.transactions.sort((a, b) => a.date.localeCompare(b.date));
+  state.deposits.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Adds (sign 1) or removes (sign −1) a payment's amount from the monthly totals. */
+function applySpending(t, sign) {
+  ensureMonth(t.month);
+  let row = state.rows.find((r) => r.category === t.category);
+  if (!row) {
+    row = { category: t.category };
+    state.rows.push(row);
+    state.categories.push(t.category);
+  }
+  row[t.month] = round2((row[t.month] || 0) + sign * t.amount);
+}
+
+function applyIncome(d, sign) {
+  ensureMonth(d.month);
+  const month = (state.income[d.month] ||= {});
+  const v = round2((month[d.source] || 0) + sign * d.amount);
+  if (Math.abs(v) < 0.005) delete month[d.source];
+  else month[d.source] = v;
+  if (!Object.keys(month).length) delete state.income[d.month];
+}
+
+/** Drops a month once nothing at all is recorded in it. */
+function pruneMonth(month) {
+  const used =
+    state.rows.some((r) => Math.abs(r[month] || 0) >= 0.005) ||
+    state.income[month] ||
+    state.transactions.some((t) => t.month === month) ||
+    state.deposits.some((d) => d.month === month);
+  if (used) return;
+  state.months = state.months.filter((m) => m !== month);
+  for (const r of state.rows) delete r[month];
+}
+
+function addManualEntry({ kind, amount, category, description, date, notes }) {
+  const id = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const month = monthOfDate(date);
+  if (kind === "income") {
+    const d = { id, manual: true, date, month, source: category, description: description || category, amount, notes };
+    state.deposits.push(d);
+    applyIncome(d, 1);
+  } else {
+    const t = {
+      id,
+      manual: true,
+      date,
+      month,
+      merchant: description || category,
+      category,
+      type: amount < 0 ? "Refund" : "Charge",
+      amount,
+      statement: null,
+      adjustment: 0,
+      review: "",
+      notes,
+    };
+    state.transactions.push(t);
+    applySpending(t, 1);
+  }
+  if (!state.sources.includes("Added by hand")) state.sources.push("Added by hand");
+  sortEntries();
+  persist();
+  render();
+  if (drawerState.category) renderDrawer();
+}
+
+function deleteManualEntry(id) {
+  const t = state.transactions.find((x) => x.id === id && x.manual);
+  const d = state.deposits.find((x) => x.id === id && x.manual);
+  if (t) {
+    applySpending(t, -1);
+    state.transactions = state.transactions.filter((x) => x !== t);
+  }
+  if (d) {
+    applyIncome(d, -1);
+    state.deposits = state.deposits.filter((x) => x !== d);
+  }
+  const entry = t || d;
+  if (!entry) return;
+  pruneMonth(entry.month);
+  persist();
+  render();
+  if (drawerState.category) renderDrawer();
+}
+
+function entryKind() {
+  return els.entryForm.elements.kind.value;
+}
+
+function syncEntryKind() {
+  const income = entryKind() === "income";
+  const form = els.entryForm.elements;
+  els.entryForm.querySelector('[data-kind-label="category"]').textContent = income ? "Source" : "Category";
+  els.entryForm.querySelector('[data-kind-label="description"]').textContent = income ? "From" : "Merchant";
+  form.category.placeholder = income ? "e.g. Payroll" : "e.g. Groceries";
+  form.description.placeholder = income ? "e.g. Employer name" : "e.g. No Frills";
+  const names = income
+    ? computeIncome().sources.map((s) => s.source)
+    : computeTotals().categoryTotals.map((c) => c.category);
+  els.entryCategories.innerHTML = names.map((n) => `<option value="${escapeAttr(n)}"></option>`).join("");
+}
+
+function openEntry() {
+  const form = els.entryForm;
+  form.reset();
+  const now = new Date();
+  form.elements.date.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  els.entryError.hidden = true;
+  syncEntryKind();
+  els.entryDrawer.hidden = false;
+  document.body.classList.add("entry-open");
+  requestAnimationFrame(() => els.entryDrawer.classList.add("is-open"));
+  setTimeout(() => form.elements.amount.focus(), 250);
+}
+
+function closeEntry() {
+  if (els.entryDrawer.hidden) return;
+  els.entryDrawer.classList.remove("is-open");
+  document.body.classList.remove("entry-open");
+  setTimeout(() => {
+    if (!els.entryDrawer.classList.contains("is-open")) els.entryDrawer.hidden = true;
+  }, 220);
+}
+
+function submitEntry(e) {
+  e.preventDefault();
+  const form = els.entryForm.elements;
+  const raw = form.amount.value.trim();
+  const amount = round2(toNumber(raw));
+  const category = form.category.value.trim();
+  const date = form.date.value;
+  let error = "";
+  if (!raw || !amount) error = "Enter an amount.";
+  else if (!category) error = entryKind() === "income" ? "Enter where the money came from." : "Pick or type a category.";
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) error = "Pick a date.";
+  els.entryError.hidden = !error;
+  els.entryError.textContent = error;
+  if (error) return;
+  addManualEntry({
+    kind: entryKind(),
+    amount,
+    category,
+    description: form.description.value.trim(),
+    date,
+    notes: form.notes.value.trim(),
+  });
+  closeEntry();
 }
 
 /** Data only ever comes from files picked on this device and lives in its local storage. */
@@ -2338,8 +2538,30 @@ function wireEvents() {
     renderDrawer();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && drawerState.category) closeDrawer();
+    if (e.key !== "Escape") return;
+    if (!els.entryDrawer.hidden) closeEntry();
+    else if (drawerState.category) closeDrawer();
   });
+
+  els.entryOpen.addEventListener("click", openEntry);
+  els.entryDrawer.addEventListener("click", (e) => {
+    if (e.target.closest("[data-entry-close]")) closeEntry();
+  });
+  els.entryForm.addEventListener("change", (e) => {
+    if (e.target.name === "kind") syncEntryKind();
+  });
+  els.entryForm.addEventListener("submit", submitEntry);
+  // Capture phase, so deleting doesn't also open a category or toggle a note.
+  document.addEventListener(
+    "click",
+    (e) => {
+      const btn = e.target.closest("[data-delete-entry]");
+      if (!btn) return;
+      e.stopPropagation();
+      if (window.confirm("Delete this entry?")) deleteManualEntry(btn.dataset.deleteEntry);
+    },
+    true
+  );
   els.rankList.addEventListener("pointerover", (e) => {
     if (e.pointerType !== "mouse") return;
     const li = e.target.closest("li");
