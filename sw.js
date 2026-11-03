@@ -1,4 +1,4 @@
-const CACHE = "spendly-v2";
+const CACHE = "spendly-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,7 +10,9 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: "reload" }))))
+  );
   self.skipWaiting();
 });
 
@@ -48,7 +50,7 @@ self.addEventListener("fetch", (event) => {
 
   if (!request.url.startsWith(self.registration.scope)) return;
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: "no-cache" })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
