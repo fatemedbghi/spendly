@@ -1,4 +1,4 @@
-const CACHE = "spendly-v4";
+const CACHE = "spendly-v5";
 const SHELL = [
   "./",
   "./index.html",
@@ -50,7 +50,8 @@ self.addEventListener("fetch", (event) => {
 
   if (!request.url.startsWith(self.registration.scope)) return;
   event.respondWith(
-    fetch(request, { cache: "no-cache" })
+    // A navigation Request can't be passed to fetch() with options, so refetch by URL.
+    fetch(request.url, { cache: "no-cache", credentials: "same-origin" })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
